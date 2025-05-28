@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Voice Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chat-bubble {
+            max-width: 75%;
+            padding: 10px 15px;
+            border-radius: 20px;
+            margin-bottom: 10px;
+            word-wrap: break-word;
+        }
+        .user-bubble {
+            background-color: #007bff; 
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+        .llm-bubble {
+            background-color: #e9ecef; 
+            color: #333;
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+        }
+        .llm-bubble pre {
+            background-color: #2d3748; /* Tailwind gray-800 */
+            color: #e2e8f0; /* Tailwind gray-300 */
+            padding: 1em;
+            overflow-x: auto;
+            border-radius: 0.5em;
+            margin: 0.5em 0;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9em;
+            white-space: pre-wrap; /* Wrap long lines in pre */
+            word-wrap: break-word; /* Break words if necessary */
+        }
+        .llm-bubble code { /* For inline code */
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #4a5568; /* Tailwind gray-600 */
+            color: #e2e8f0; /* Tailwind gray-300 */
+            padding: 0.2em 0.4em;
+            border-radius: 0.3em;
+            font-size: 0.9em;
+        }
+        .llm-bubble pre code { /* Reset for code inside pre */
+            background-color: transparent;
+            padding: 0;
+            font-size: inherit;
+            color: inherit;
+            border-radius: 0;
+        }
+
+        .loading-dots span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: #007bff;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1.0); }
+        }
+        #chatArea::-webkit-scrollbar {
+            width: 8px;
+        }
+        #chatArea::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        #chatArea::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        #chatArea::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-br from-slate-900 to-slate-700 text-slate-100">
+
+    <div class="w-full max-w-4xl bg-slate-800 shadow-2xl rounded-xl p-6">
+        <h1 class="text-3xl font-bold text-center mb-6 text-sky-400">AI Chat Interface</h1>
+
+            <div class="mb-6">
+                <label for="modelSelection" class="block text-sm font-medium text-slate-300 mb-1">Choose Model Endpoint:</label>
+                <select id="modelSelection" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none text-slate-100">
+                    <option value="ollama">Ollama (Default: gemma3)</option>
+                    <option value="lmstudio">LM Studio (Default: your_loaded_model_name)</option>
+                </select>
+            </div>
+            
+            <div id="ollamaModelNameGroup" class="mb-4">
+                <label for="ollamaModelName" class="block text-sm font-medium text-slate-300 mb-1">Ollama Model Name (e.g., llama3, mistral):</label>
+                <input type="text" id="ollamaModelName" value="gemma3" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none text-slate-100" placeholder="Enter Ollama model name">
+            </div>
+            <div id="lmStudioModelNameGroup" class="mb-4 hidden">
+                <label for="lmStudioModelName" class="block text-sm font-medium text-slate-300 mb-1">LM Studio Model Identifier:</label>
+                <input type="text" id="lmStudioModelName" value="your_loaded_model_name_in_lm_studio" class="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none text-slate-100" placeholder="Enter LM Studio model identifier">
+            </div>
+
+        <div id="chatArea" class="h-96 overflow-y-auto mb-4 p-4 bg-slate-900 rounded-lg border border-slate-700 space-y-4">
+            </div>
+
+        <form id="promptForm" class="space-y-4">
+            <div class="flex items-center space-x-2">
+                <textarea id="prompt" name="prompt" rows="3" class="flex-grow p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none text-slate-100 resize-none" placeholder="Type your message or use the microphone..."></textarea>
+                <button type="button" id="microphoneBtn" class="p-3 bg-sky-500 hover:bg-sky-600 text-white rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-2 focus:ring-offset-slate-800">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mic"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                </button>
+            </div>
+            <button type="submit" id="submitBtn" class="w-full p-3 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-800">
+                Send Message
+            </button>
+        </form>
+        
+        <div id="loadingIndicator" class="hidden text-center mt-4">
+            <div class="loading-dots inline-block">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <p class="text-sm text-slate-400">AI is thinking...</p>
+        </div>
+
+        <div id="errorMessage" class="hidden mt-4 p-3 bg-red-500 text-white rounded-lg"></div>
+    </div>
+
+    <script>
+        const promptForm = document.getElementById('promptForm');
+        const promptInput = document.getElementById('prompt');
+        const chatArea = document.getElementById('chatArea');
+        const microphoneBtn = document.getElementById('microphoneBtn');
+        const modelSelection = document.getElementById('modelSelection');
+        const ollamaModelNameInput = document.getElementById('ollamaModelName');
+        const lmStudioModelNameInput = document.getElementById('lmStudioModelName');
+        const ollamaModelNameGroup = document.getElementById('ollamaModelNameGroup');
+        const lmStudioModelNameGroup = document.getElementById('lmStudioModelNameGroup');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const submitBtn = document.getElementById('submitBtn');
+        const errorMessageDiv = document.getElementById('errorMessage');
+
+        let currentLlmBubble = null; 
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition;
+        
+        const micOnIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mic"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>`;
+        const micOffIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mic-off"><line x1="16.5" x2="16.5" y1="10.5" y2="13.5"/><line x1="8" x2="8" y1="4" y2="12"/><line x1="12" x2="12" y1="4" y2="4.5"/><line x1="12" x2="12" y1="19" y2="22"/><path d="M19 10v2a7 7 0 0 1-11.46-5.5"/><line x1="2" x2="22" y1="2" y2="22"/><path d="M15 9.5a3 3 0 0 0-5.06-2.02"/></svg>`;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false; 
+            recognition.lang = 'en-US'; 
+            recognition.interimResults = false; 
+
+            recognition.onstart = () => {
+                microphoneBtn.classList.add('bg-red-500');
+                microphoneBtn.classList.remove('bg-sky-500');
+                microphoneBtn.innerHTML = micOffIcon; 
+            };
+            recognition.onresult = (event) => promptInput.value = event.results[0][0].transcript;
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                showError(`Speech recognition error: ${event.error}`);
+                microphoneBtn.classList.remove('bg-red-500');
+                microphoneBtn.classList.add('bg-sky-500');
+                microphoneBtn.innerHTML = micOnIcon; 
+            };
+            recognition.onend = () => {
+                microphoneBtn.classList.remove('bg-red-500');
+                microphoneBtn.classList.add('bg-sky-500');
+                microphoneBtn.innerHTML = micOnIcon; 
+            };
+            microphoneBtn.addEventListener('click', () => {
+                if (recognition && recognition.recognizing) { 
+                    recognition.stop();
+                } else {
+                    try {
+                        if (synth.speaking) synth.cancel();
+                        clearTimeout(speechTimeout); 
+                        recognition.start();
+                    } catch (e) {
+                        console.error("Error starting recognition: ", e);
+                        showError("Could not start microphone. Please check permissions.");
+                        microphoneBtn.classList.remove('bg-red-500'); 
+                        microphoneBtn.classList.add('bg-sky-500');
+                        microphoneBtn.innerHTML = micOnIcon; 
+                    }
+                }
+            });
+        } else {
+            microphoneBtn.disabled = true;
+            microphoneBtn.title = "Speech recognition not supported.";
+            showError("Speech recognition not supported in your browser.");
+        }
+
+        const synth = window.speechSynthesis;
+        let utterance;
+        let speechTimeout; 
+
+        function speakText(text) {
+            if (synth.speaking) synth.cancel();
+            clearTimeout(speechTimeout); 
+
+            if (text && text.trim()) {
+                if (recognition && recognition.recognizing) { // Check .recognizing state
+                    console.log("Recognition active, speech suppressed.");
+                    return;
+                }
+                utterance = new SpeechSynthesisUtterance(text.trim());
+                utterance.onerror = (event) => {
+                    console.error('Speech synthesis error:', event.error);
+                    showError(`Speech synthesis error: ${event.error}`);
+                };
+                speechTimeout = setTimeout(() => synth.speak(utterance), 1000); 
+            }
+        }
+        
+        function escapeHtml(unsafe) {
+            return unsafe
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+
+        function formatLlmResponseWithCode(rawText) {
+            // Escape HTML special characters in the entire text first, except for what we will transform.
+            let html = escapeHtml(rawText);
+
+            // Replace Markdown-style code blocks ```lang\ncode\n```
+            const codeBlockRegex = /```(\w*)\n([\s\S]*?)\n```/g;
+            html = html.replace(codeBlockRegex, (match, lang, code) => {
+                // The 'code' is already HTML-escaped by the initial escapeHtml call.
+                // We just need to wrap it.
+                const languageClass = lang ? `language-${lang}` : '';
+                // No need to re-escape 'code' here as it was part of rawText and already escaped.
+                return `<pre><code class="${languageClass}">${code}</code></pre>`;
+            });
+
+            // Replace Markdown-style inline code `code`
+            const inlineCodeRegex = /`([^`]+)`/g;
+            html = html.replace(inlineCodeRegex, (match, inlineCode) => {
+                // 'inlineCode' is also already HTML-escaped.
+                return `<code>${inlineCode}</code>`;
+            });
+            
+            // Convert newlines to <br> tags, but only outside of <pre> blocks.
+            const parts = html.split(/(<pre[\s\S]*?<\/pre>)/g); // Split by <pre> blocks
+            const processedParts = parts.map(part => {
+                if (part.startsWith("<pre")) { // Check if it's a <pre> block
+                    return part; // Keep <pre> blocks as is (newlines are preserved by <pre>)
+                } else {
+                    return part.replace(/\n/g, "<br>"); // Convert newlines to <br> in other parts
+                }
+            });
+            return processedParts.join("");
+        }
+
+
+        modelSelection.addEventListener('change', (e) => {
+            const selected = e.target.value;
+            ollamaModelNameGroup.classList.toggle('hidden', selected !== 'ollama');
+            lmStudioModelNameGroup.classList.toggle('hidden', selected !== 'lmstudio');
+        });
+        ollamaModelNameGroup.classList.toggle('hidden', modelSelection.value !== 'ollama');
+        lmStudioModelNameGroup.classList.toggle('hidden', modelSelection.value !== 'lmstudio');
+
+        promptForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const userPrompt = promptInput.value.trim();
+            if (!userPrompt) return;
+
+            const selectedEndpointValue = modelSelection.value;
+            let modelName = (selectedEndpointValue === 'ollama' ? ollamaModelNameInput.value.trim() : lmStudioModelNameInput.value.trim()) || 
+                            (selectedEndpointValue === 'ollama' ? 'gemma3' : 'your_loaded_model_name');
+            let endpointUrl = selectedEndpointValue === 'ollama' ? '/generate' : '/lmstudio';
+
+            addMessageToChat(userPrompt, 'user');
+            promptInput.value = ''; 
+            showLoading(true);
+            showError(null); 
+            
+            if (synth.speaking) synth.cancel();
+            clearTimeout(speechTimeout);
+            
+            currentLlmBubble = addMessageToChat('', 'llm', true); 
+
+            const formData = new FormData();
+            formData.append('prompt', userPrompt);
+            formData.append('model', modelName);
+
+            try {
+                const response = await fetch(endpointUrl, { method: 'POST', body: formData });
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullResponseText = ""; 
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) {
+                        if (currentLlmBubble && fullResponseText.trim()) {
+                            currentLlmBubble.innerHTML = formatLlmResponseWithCode(fullResponseText);
+                            chatArea.scrollTop = chatArea.scrollHeight;
+                        }
+                        if (fullResponseText.trim()) {
+                            speakText(fullResponseText); // Speak the raw, unformatted text
+                        }
+                        break;
+                    }
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n\n'); // SSE delimiter
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const jsonData = JSON.parse(line.substring(5));
+                                if (jsonData.text) {
+                                    appendToLlmBubble(jsonData.text); // Streams plain text
+                                    fullResponseText += jsonData.text; 
+                                } else if (jsonData.error) {
+                                    console.error('LLM Error:', jsonData.error, jsonData.details || '');
+                                    showError(`LLM Error: ${jsonData.error} ${jsonData.details || ''}`);
+                                    if (currentLlmBubble && !currentLlmBubble.textContent.trim()) currentLlmBubble.remove();
+                                    currentLlmBubble = null;
+                                    if (fullResponseText.trim()) speakText(fullResponseText);
+                                    fullResponseText = ""; 
+                                } else if (jsonData.status === 'done') {
+                                    console.log("Stream finished by server (data signal).");
+                                }
+                            } catch (e) {
+                                console.warn('Failed to parse JSON from stream:', line, e);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching LLM response:', error);
+                showError(`Error: ${error.message}`);
+                if (currentLlmBubble && !currentLlmBubble.textContent.trim()) currentLlmBubble.remove();
+                if (fullResponseText && fullResponseText.trim()) speakText(fullResponseText);
+            } finally {
+                showLoading(false);
+                // currentLlmBubble is reset when a new message starts or if it's removed on error.
+            }
+        });
+
+        function addMessageToChat(text, sender, isEmptyBubble = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('chat-bubble', sender === 'user' ? 'user-bubble' : 'llm-bubble');
+            
+            if (sender === 'llm' && isEmptyBubble) {
+                // Initially empty, will be filled by streaming text or later by formatted HTML
+                messageDiv.textContent = ''; 
+            } else {
+                 // For user messages or non-empty LLM messages (though not used in current flow for LLM initial)
+                messageDiv.textContent = text;
+            }
+            
+            chatArea.appendChild(messageDiv);
+            chatArea.scrollTop = chatArea.scrollHeight; 
+            return messageDiv; 
+        }
+        
+        function appendToLlmBubble(textChunk) {
+            // This function appends plain text during streaming.
+            // The final formatting will replace the entire innerHTML.
+            if (currentLlmBubble) {
+                currentLlmBubble.textContent += textChunk; // Append as plain text
+                chatArea.scrollTop = chatArea.scrollHeight;
+            }
+        }
+
+        function showLoading(isLoading) {
+            loadingIndicator.classList.toggle('hidden', !isLoading);
+            submitBtn.disabled = isLoading;
+            submitBtn.classList.toggle('opacity-50', isLoading);
+            submitBtn.classList.toggle('cursor-not-allowed', isLoading);
+        }
+
+        function showError(message) {
+            errorMessageDiv.textContent = message || '';
+            errorMessageDiv.classList.toggle('hidden', !message);
+        }
+    </script>
+</body>
+</html>
