@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useSupabase } from '../context/SupabaseContext';
 import VideoCall from './VideoCall';
 import QuestionPanel from './QuestionPanel';
+import { AgoraRTCProvider, createClient } from 'agora-rtc-react';
 
 interface InterviewData {
   id: string;
@@ -11,6 +12,12 @@ interface InterviewData {
   job_title: string;
   candidate_name: string;
 }
+
+// Create Agora client configuration
+const client = createClient({
+  mode: "rtc",
+  codec: "vp8"
+});
 
 function InterviewRoom() {
   const { id } = useParams<{ id: string }>();
@@ -60,7 +67,9 @@ function InterviewRoom() {
     <div className="h-screen flex">
       <div className="flex-1 flex flex-col">
         <div className="h-2/3">
-          <VideoCall />
+          <AgoraRTCProvider client={client}>
+            <VideoCall />
+          </AgoraRTCProvider>
         </div>
         <div className="h-1/3 p-4 bg-white">
           <textarea
