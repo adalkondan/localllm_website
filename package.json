@@ -1,30 +1,6 @@
 {
-  "name": "interview-app",
-  "version": "1.0.0",
-  "description": "Video interview application with AI-powered assessment",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.7",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.22.2",
-    "agora-rtc-react": "^2.1.0",
-    "marked": "^12.0.0",
-    "tailwindcss": "^3.4.1",
-    "@headlessui/react": "^1.7.18",
-    "@heroicons/react": "^2.1.1"
-  },
-  "devDependencies": {
-    "@types/react": "^18.2.61",
-    "@types/react-dom": "^18.2.19",
-    "@vitejs/plugin-react": "^4.2.1",
-    "autoprefixer": "^10.4.17",
-    "postcss": "^8.4.35",
-    "typescript": "^5.3.3",
-    "vite": "^5.1.4"
+    "agora-rtc-react": "^1.1.3",
+    "agora-rtc-sdk-ng": "^4.19.3"
   }
 }
